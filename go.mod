@@ -93,3 +93,6 @@ require (
 	golang.zx2c4.com/wireguard/windows v1.0.1 // indirect
 	gvisor.dev/gvisor v0.0.0-20260915211658-a6f909f08a72 // indirect
 )
+
+// Patched copy (see patches/tailscale, scripts/tailscale-src.sh).
+replace tailscale.com => ./third_party/tailscale

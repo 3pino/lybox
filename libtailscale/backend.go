@@ -74,6 +74,7 @@ func start(dataDir, directFileRoot string, hwAttestationPref bool, appCtx AppCon
 	}()
 
 	initLogging(appCtx)
+	powerDataDir = dataDir
 	// Set XDG_CACHE_HOME to make os.UserCacheDir work.
 	if _, exists := os.LookupEnv("XDG_CACHE_HOME"); !exists {
 		cachePath := filepath.Join(dataDir, "cache")
@@ -131,6 +132,7 @@ func (b *backend) applyAndroidNetworkChange(change networkState) {
 	b.androidNetworkMu.Unlock()
 
 	netmon.UpdateLastKnownDefaultGateway(change.gateway)
+	b.applyPowerPolicy(change.ifname)
 	b.NetworkChanged(change.ifname)
 }
 

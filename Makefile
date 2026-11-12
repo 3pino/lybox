@@ -198,7 +198,12 @@ tailscale-test.apk: version gradle-dependencies
 # tag_release / bumposs).
 MKVERSION := ./tool/go run tailscale.com/cmd/mkversion
 
-tailscale.version: go.mod go.sum go.toolchain.rev $(wildcard .git/HEAD)
+# Patched tailscale.com module that go.mod's replace directive points at.
+.PHONY: tailscale-src
+tailscale-src:
+	./scripts/tailscale-src.sh
+
+tailscale.version: go.mod go.sum go.toolchain.rev $(wildcard .git/HEAD) | tailscale-src
 	@bash -c "$(MKVERSION) > tailscale.version"
 
 .PHONY: version
@@ -215,14 +220,14 @@ android/libs:
 $(GOBIN):
 	mkdir -p $(GOBIN)
 
-$(GOBIN)/gomobile: $(GOBIN)/gobind go.mod go.sum go.toolchain.rev | $(GOBIN)
+$(GOBIN)/gomobile: $(GOBIN)/gobind go.mod go.sum go.toolchain.rev | $(GOBIN) tailscale-src
 	./tool/go install golang.org/x/mobile/cmd/gomobile
 
-$(GOBIN)/gobind: go.mod go.sum go.toolchain.rev
+$(GOBIN)/gobind: go.mod go.sum go.toolchain.rev | tailscale-src
 	./tool/go install golang.org/x/mobile/cmd/gobind
 
 .PHONY: build-unstripped-aar
-build-unstripped-aar: tailscale.version $(GOBIN)/gomobile
+build-unstripped-aar: tailscale-src tailscale.version $(GOBIN)/gomobile
 	@echo "Running gomobile bind to generate unstripped AAR..."
 	@echo "Output file: $(ABS_UNSTRIPPED_AAR)"
 	mkdir -p $(dir $(ABS_UNSTRIPPED_AAR))
@@ -240,7 +245,9 @@ build-unstripped-aar: tailscale.version $(GOBIN)/gomobile
 
 $(UNSTRIPPED_AAR): build-unstripped-aar
 
-libgojni.so.unstripped: $(UNSTRIPPED_AAR)
+# build-unstripped-aar is listed explicitly: depending only on the AAR file left
+# a stale libgojni.so.stripped behind after Go-only changes.
+libgojni.so.unstripped: $(UNSTRIPPED_AAR) build-unstripped-aar
 	@echo "Extracting libgojni.so from unstripped AAR..."
 	@if unzip -p $(ABS_UNSTRIPPED_AAR) jni/arm64-v8a/libgojni.so > libgojni.so.unstripped; then \
 	    echo "Found arm64-v8a libgojni.so"; \

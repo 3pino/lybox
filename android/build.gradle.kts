@@ -20,6 +20,8 @@ android {
   compileSdk = providers.gradleProperty("androidCompileSdk").get().toInt()
 
   defaultConfig {
+    // Distinct from the official app so both can be installed side by side.
+    applicationId = "dev.lybox.ts"
     minSdk = 26
     targetSdk = providers.gradleProperty("androidApiLevel").get().toInt()
 

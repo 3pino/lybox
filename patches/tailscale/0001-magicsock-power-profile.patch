@@ -1,0 +1,188 @@
+diff -ruN a/wgengine/magicsock/endpoint.go b/wgengine/magicsock/endpoint.go
+--- a/wgengine/magicsock/endpoint.go	2026-11-12 17:28:25.190053230 +0900
++++ b/wgengine/magicsock/endpoint.go	2026-11-12 17:28:25.281942471 +0900
+@@ -132,7 +132,7 @@
+ 		// TODO(jwhited): collapse path change logging with endpoint.handlePongConnLocked()
+ 		de.c.logf("magicsock: disco: node %v %v now using %v mtu=%v", de.publicKey.ShortString(), de.discoShort(), maybeBest.epAddr, maybeBest.wireMTU)
+ 		de.setBestAddrLocked(maybeBest)
+-		de.trustBestAddrUntil = now.Add(trustUDPAddrDuration)
++		de.trustBestAddrUntil = now.Add(trustUDPAddrDurationNow())
+ 	}
+ }
+ 
+@@ -306,7 +306,7 @@
+ 		return false
+ 	}
+ 	for i, c := range p.Cliffs {
+-		if c <= max(udpLifetimeProbeCliffSlack*2, heartbeatInterval) {
++		if c <= max(udpLifetimeProbeCliffSlack*2, heartbeatIntervalNow()) {
+ 			// A timeout cliff less than or equal to twice
+ 			// udpLifetimeProbeCliffSlack is invalid due to being effectively
+ 			// zero when the cliff slack is subtracted from the cliff value at
+@@ -592,7 +592,7 @@
+ 		// to DERP.
+ 		de.mu.Lock()
+ 		if de.heartbeatDisabled && de.bestAddr.epAddr == src {
+-			de.trustBestAddrUntil = now.Add(trustUDPAddrDuration)
++			de.trustBestAddrUntil = now.Add(trustUDPAddrDurationNow())
+ 		}
+ 		de.mu.Unlock()
+ 	}
+@@ -942,7 +942,7 @@
+ 		de.discoverUDPRelayPathsLocked(now)
+ 	}
+ 
+-	de.heartBeatTimer = time.AfterFunc(heartbeatInterval, de.heartbeat)
++	de.heartBeatTimer = time.AfterFunc(heartbeatIntervalNow(), de.heartbeat)
+ }
+ 
+ // setHeartbeatDisabled sets heartbeatDisabled to the provided value.
+@@ -1016,7 +1016,7 @@
+ 	if de.bestAddr.latency <= goodEnoughLatency {
+ 		return false
+ 	}
+-	if now.Sub(de.lastFullPing) >= upgradeUDPDirectInterval {
++	if now.Sub(de.lastFullPing) >= upgradeUDPDirectIntervalNow() {
+ 		return true
+ 	}
+ 	return false
+@@ -1025,7 +1025,7 @@
+ func (de *endpoint) noteTxActivityExtTriggerLocked(now mono.Time) {
+ 	de.lastSendExt = now
+ 	if hasUDPTransport && de.heartBeatTimer == nil && !de.heartbeatDisabled {
+-		de.heartBeatTimer = time.AfterFunc(heartbeatInterval, de.heartbeat)
++		de.heartBeatTimer = time.AfterFunc(heartbeatIntervalNow(), de.heartbeat)
+ 	}
+ }
+ 
+@@ -2021,7 +2021,7 @@
+ 			})
+ 			de.bestAddr.latency = latency
+ 			de.bestAddrAt = now
+-			de.trustBestAddrUntil = now.Add(trustUDPAddrDuration)
++			de.trustBestAddrUntil = now.Add(trustUDPAddrDurationNow())
+ 		}
+ 	}
+ 	return
+diff -ruN a/wgengine/magicsock/lybox_power.go b/wgengine/magicsock/lybox_power.go
+--- a/wgengine/magicsock/lybox_power.go	1970-01-01 09:00:00.000000000 +0900
++++ b/wgengine/magicsock/lybox_power.go	2026-11-12 17:52:30.541979225 +0900
+@@ -0,0 +1,88 @@
++// Copyright (c) Tailscale Inc & contributors
++// SPDX-License-Identifier: BSD-3-Clause
++
++package magicsock
++
++import (
++	"sync/atomic"
++	"time"
++
++	"tailscale.com/net/netcheck"
++)
++
++// PowerProfile lets an embedding app trade path-maintenance chatter for
++// battery life at runtime. The zero value keeps upstream behaviour.
++type PowerProfile struct {
++	// HeartbeatInterval is how often the best direct path is pinged while a
++	// session is active. Zero means the upstream default (3s).
++	HeartbeatInterval time.Duration
++
++	// UpgradeDirectInterval is how often a better direct path is searched for
++	// while a working one exists. Zero means the upstream default (1m).
++	UpgradeDirectInterval time.Duration
++
++	// PeriodicSTUNInterval is the delay between background STUN/netcheck
++	// rounds while a session is active. Zero means the upstream default
++	// (20-26s); a negative value disables periodic STUN entirely.
++	PeriodicSTUNInterval time.Duration
++
++	// NetcheckMinInterval, when positive, makes updateNetInfo reuse the last
++	// netcheck report instead of probing again while that report is younger
++	// than this. Without UDP every netcheck degrades to HTTPS latency probes
++	// against every DERP region (~1MB each), so DERP-only mode wants this large.
++	NetcheckMinInterval time.Duration
++}
++
++var powerProfile atomic.Pointer[PowerProfile]
++
++// SetPowerProfile installs p for all current and future connections.
++func SetPowerProfile(p PowerProfile) { powerProfile.Store(&p) }
++
++func heartbeatIntervalNow() time.Duration {
++	if p := powerProfile.Load(); p != nil && p.HeartbeatInterval > 0 {
++		return p.HeartbeatInterval
++	}
++	return heartbeatInterval
++}
++
++// trustUDPAddrDurationNow keeps the upstream 6.5s/3s ratio (3.5s of slack
++// after a missed heartbeat) when the heartbeat interval is stretched.
++func trustUDPAddrDurationNow() time.Duration {
++	if p := powerProfile.Load(); p != nil && p.HeartbeatInterval > 0 {
++		return p.HeartbeatInterval + trustUDPAddrDuration - heartbeatInterval
++	}
++	return trustUDPAddrDuration
++}
++
++func upgradeUDPDirectIntervalNow() time.Duration {
++	if p := powerProfile.Load(); p != nil && p.UpgradeDirectInterval > 0 {
++		return p.UpgradeDirectInterval
++	}
++	return upgradeUDPDirectInterval
++}
++
++// periodicSTUNDelay returns the delay before the next periodic STUN round and
++// whether periodic STUN is enabled at all.
++func periodicSTUNDelay(upstream time.Duration) (time.Duration, bool) {
++	if p := powerProfile.Load(); p != nil {
++		if p.PeriodicSTUNInterval < 0 {
++			return 0, false
++		}
++		if p.PeriodicSTUNInterval > 0 {
++			return p.PeriodicSTUNInterval, true
++		}
++	}
++	return upstream, true
++}
++
++// cachedNetcheck returns the last report if it is fresh enough to skip a probe.
++func cachedNetcheck(last *netcheck.Report) (*netcheck.Report, bool) {
++	p := powerProfile.Load()
++	if p == nil || p.NetcheckMinInterval <= 0 || last == nil || last.Now.IsZero() {
++		return nil, false
++	}
++	if time.Since(last.Now) < p.NetcheckMinInterval {
++		return last, true
++	}
++	return nil, false
++}
+diff -ruN a/wgengine/magicsock/magicsock.go b/wgengine/magicsock/magicsock.go
+--- a/wgengine/magicsock/magicsock.go	2026-11-12 17:28:25.190377209 +0900
++++ b/wgengine/magicsock/magicsock.go	2026-11-12 17:52:30.542576641 +0900
+@@ -911,12 +911,12 @@
+ 				go c.updateEndpoints(why)
+ 				return
+ 			}
+-			if c.shouldDoPeriodicReSTUNLocked() {
+-				// Pick a random duration between 20
++			d, periodicOK := periodicSTUNDelay(tstime.RandomDurationBetween(20*time.Second, 26*time.Second))
++			if periodicOK && c.shouldDoPeriodicReSTUNLocked() {
++				// Upstream picks a random duration between 20
+ 				// and 26 seconds (just under 30s, a
+ 				// common UDP NAT timeout on Linux,
+-				// etc)
+-				d := tstime.RandomDurationBetween(20*time.Second, 26*time.Second)
++				// etc); see PowerProfile.PeriodicSTUNInterval.
+ 				if t := c.periodicReSTUNTimer; t != nil {
+ 					if debugReSTUNStopOnIdle() {
+ 						c.logf("resetting existing periodicSTUN to run in %v", d)
+@@ -1045,6 +1045,9 @@
+ 	if dm == nil || c.networkDown() {
+ 		return new(netcheck.Report), nil
+ 	}
++	if last, ok := cachedNetcheck(c.lastNetCheckReport.Load()); ok {
++		return last, nil
++	}
+ 
+ 	report, err := c.netChecker.GetReport(ctx, dm, &netcheck.GetReportOpts{
+ 		// Pass information about the last time that we received a
