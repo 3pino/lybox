@@ -1,3 +1,55 @@
+diff -ruN a/control/controlclient/direct.go b/control/controlclient/direct.go
+--- a/control/controlclient/direct.go	2026-11-12 17:28:25.119303516 +0900
++++ b/control/controlclient/direct.go	2026-11-12 18:37:09.249126940 +0900
+@@ -1323,6 +1323,11 @@
+ 			c.logf.JSON(1, "controltime", resp.ControlTime.UTC())
+ 			c.controlTimePub.Publish(ControlTime{c.controlClientID, *resp.ControlTime})
+ 		}
++		if TraceMap.Load() {
++			c.logf("lybox-map: %d bytes keepalive=%v peers=%d changed=%d removed=%d patches=%d online=%d lastseen=%d",
++				len(msg), resp.KeepAlive, len(resp.Peers), len(resp.PeersChanged), len(resp.PeersRemoved),
++				len(resp.PeersChangedPatch), len(resp.OnlineChange), len(resp.PeerSeenChange))
++		}
+ 		if resp.KeepAlive {
+ 			vlogf("netmap: got keep-alive")
+ 		} else {
+@@ -2013,3 +2018,7 @@
+ 	metricSetDNS      = clientmetric.NewCounter("controlclient_setdns")
+ 	metricSetDNSError = clientmetric.NewCounter("controlclient_setdns_error")
+ )
++
++// TraceMap, when set, logs a one-line summary of every MapResponse. Diagnostic
++// for idle-traffic investigations.
++var TraceMap atomic.Bool
+diff -ruN a/derp/derp_client.go b/derp/derp_client.go
+--- a/derp/derp_client.go	2026-11-12 17:28:25.120369877 +0900
++++ b/derp/derp_client.go	2026-11-12 18:37:15.920593988 +0900
+@@ -13,6 +13,7 @@
+ 	"net"
+ 	"net/netip"
+ 	"sync"
++	"sync/atomic"
+ 	"time"
+ 
+ 	"go4.org/mem"
+@@ -587,6 +588,9 @@
+ 		if err != nil {
+ 			return nil, err
+ 		}
++		if TraceFrames.Load() {
++			c.logf("lybox-derp: rx frame type=%v len=%d", t, n)
++		}
+ 		if n > 1<<20 {
+ 			return nil, fmt.Errorf("unexpectedly large frame of %d bytes returned", n)
+ 		}
+@@ -778,3 +782,7 @@
+ 	}
+ 	return nil, b, false
+ }
++
++// TraceFrames, when set, logs every frame received from the DERP server
++// (type and length). Diagnostic for idle-traffic investigations.
++var TraceFrames atomic.Bool
 diff -ruN a/wgengine/magicsock/endpoint.go b/wgengine/magicsock/endpoint.go
 --- a/wgengine/magicsock/endpoint.go	2026-11-12 17:28:25.190053230 +0900
 +++ b/wgengine/magicsock/endpoint.go	2026-11-12 17:28:25.281942471 +0900
@@ -158,8 +210,16 @@ diff -ruN a/wgengine/magicsock/lybox_power.go b/wgengine/magicsock/lybox_power.g
 +}
 diff -ruN a/wgengine/magicsock/magicsock.go b/wgengine/magicsock/magicsock.go
 --- a/wgengine/magicsock/magicsock.go	2026-11-12 17:28:25.190377209 +0900
-+++ b/wgengine/magicsock/magicsock.go	2026-11-12 17:52:30.542576641 +0900
-@@ -911,12 +911,12 @@
++++ b/wgengine/magicsock/magicsock.go	2026-11-12 18:56:49.899637728 +0900
+@@ -29,6 +29,7 @@
+ 	"github.com/tailscale/wireguard-go/device"
+ 	"go4.org/mem"
+ 	"tailscale.com/control/controlknobs"
++	"tailscale.com/derp"
+ 	"tailscale.com/disco"
+ 	"tailscale.com/envknob"
+ 	"tailscale.com/feature/buildfeatures"
+@@ -911,12 +912,12 @@
  				go c.updateEndpoints(why)
  				return
  			}
@@ -176,7 +236,7 @@ diff -ruN a/wgengine/magicsock/magicsock.go b/wgengine/magicsock/magicsock.go
  				if t := c.periodicReSTUNTimer; t != nil {
  					if debugReSTUNStopOnIdle() {
  						c.logf("resetting existing periodicSTUN to run in %v", d)
-@@ -1045,6 +1045,9 @@
+@@ -1045,6 +1046,9 @@
  	if dm == nil || c.networkDown() {
  		return new(netcheck.Report), nil
  	}
@@ -186,3 +246,13 @@ diff -ruN a/wgengine/magicsock/magicsock.go b/wgengine/magicsock/magicsock.go
  
  	report, err := c.netChecker.GetReport(ctx, dm, &netcheck.GetReportOpts{
  		// Pass information about the last time that we received a
+@@ -2312,6 +2316,9 @@
+ 	}
+ 
+ 	dm, err := disco.Parse(payload)
++	if derp.TraceFrames.Load() {
++		c.logf("lybox-disco: rx %T from node %v disco %v via %s len=%d", dm, derpNodeSrc.ShortString(), sender.ShortString(), via, len(msg))
++	}
+ 	if debugDisco() {
+ 		c.logf("magicsock: disco: disco.Parse = %T, %v", dm, err)
+ 	}

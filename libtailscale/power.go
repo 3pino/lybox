@@ -36,6 +36,8 @@ var (
 	powerMu      sync.Mutex
 	powerCurrent powerPolicy
 	powerSet     bool
+	powerIface   string // last non-empty default-route interface
+	powerMode    string // mode that produced powerCurrent
 )
 
 type powerPolicy struct {
@@ -111,6 +113,7 @@ func choosePolicy(mode string, cellular bool) powerPolicy {
 // It must run before the network change is delivered to netmon so that the
 // rebind that follows already sees the new DERP-only setting.
 func (b *backend) applyPowerPolicy(ifname string) {
+	traceBackend.Store(b)
 	if ifname == "" {
 		return // offline: keep whatever was active
 	}
@@ -119,6 +122,7 @@ func (b *backend) applyPowerPolicy(ifname string) {
 	p := choosePolicy(mode, cellular)
 
 	powerMu.Lock()
+	powerIface, powerMode = ifname, mode
 	changedDERP := !powerSet || p.derpOnly != powerCurrent.derpOnly
 	changed := !powerSet || p != powerCurrent
 	powerCurrent, powerSet = p, true
@@ -142,5 +146,22 @@ func (b *backend) applyPowerPolicy(ifname string) {
 			b.backend.DebugRebind()
 			b.backend.DebugReSTUN()
 		}()
+	}
+}
+
+// watchPowerMode re-applies the policy when power_mode changes on disk, so
+// experiments don't need a network flap or a restart.
+func watchPowerMode() {
+	for range time.Tick(5 * time.Second) {
+		b := traceBackend.Load()
+		if b == nil {
+			continue
+		}
+		powerMu.Lock()
+		iface, last := powerIface, powerMode
+		powerMu.Unlock()
+		if iface != "" && readPowerMode() != last {
+			b.applyPowerPolicy(iface)
+		}
 	}
 }

@@ -75,6 +75,7 @@ func start(dataDir, directFileRoot string, hwAttestationPref bool, appCtx AppCon
 
 	initLogging(appCtx)
 	powerDataDir = dataDir
+	startTrafficLog()
 	// Set XDG_CACHE_HOME to make os.UserCacheDir work.
 	if _, exists := os.LookupEnv("XDG_CACHE_HOME"); !exists {
 		cachePath := filepath.Join(dataDir, "cache")
