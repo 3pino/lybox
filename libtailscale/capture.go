@@ -51,7 +51,10 @@ func captureCallback(path packet.CapturePath, _ time.Time, data []byte, _ packet
 		}
 		// Collapse ephemeral ports: keep only the lower one (the service).
 		sp, dp := p.Src.Port(), p.Dst.Port()
-		if sp != 0 && dp != 0 {
+		if sp != 0 && dp != 0 && (sp == 8080 || dp == 8080) {
+			// keep both ports for the disnans server so connections can be told apart
+			k.src, k.dst = fmt.Sprintf("%s:%d", p.Src.Addr(), sp), fmt.Sprintf("%s:%d", p.Dst.Addr(), dp)
+		} else if sp != 0 && dp != 0 {
 			if sp < dp {
 				k.src, k.dst = fmt.Sprintf("%s:%d", p.Src.Addr(), sp), p.Dst.Addr().String()
 			} else {
