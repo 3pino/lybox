@@ -42,9 +42,24 @@ Trade-offs:
 - A dead path is noticed more slowly than with a 3 s heartbeat.
 - Incoming connections keep working: the tunnel stays up and the device stays reachable.
 
-## Power mode
+## Settings: turn LyBox features on or off
 
-The mode is read from a file in the app's private directory and re-read every few seconds.
+Open **Settings** and scroll to **LyBox power saving**. Each LyBox change has its own switch,
+so you can use LyBox-only behaviour, the official behaviour, or any mix. Changes apply within
+a few seconds, without reconnecting.
+
+| Switch (default on) | What it does when on | When off |
+|---|---|---|
+| Relay only on mobile data | On cellular, use DERP relays only, no UDP or STUN | Direct paths and STUN, as official |
+| Relaxed path probing | Heartbeat 20 s, direct-path retry and STUN every 5 min | 3 s heartbeat and frequent STUN, as official |
+| Cache relay latency checks | While relay-only, re-measure DERP latency at most every 12 h | Re-measure as official |
+
+With all switches off, the network behaviour is the same as the official app.
+
+### Advanced: `power_mode` override
+
+For experiments, a file in the app's private directory overrides the switches. It is re-read
+every few seconds.
 
 ```sh
 adb shell run-as dev.lybox.ts sh -c 'echo MODE > files/power_mode'
@@ -52,12 +67,10 @@ adb shell run-as dev.lybox.ts sh -c 'echo MODE > files/power_mode'
 
 | MODE | Behaviour |
 |---|---|
-| `auto` (default) | cellular: DERP only. Wi-Fi and others: relaxed probing |
+| `auto` (default) | follow the switches above |
 | `derp` | always DERP only |
 | `relaxed` | always direct paths with relaxed probing |
 | `stock` | upstream behaviour (for comparison) |
-
-There is no in-app setting yet.
 
 ## How it is built
 
@@ -89,7 +102,7 @@ arm64 APK and attaches it to a GitHub Release. The signing key is stored in repo
 
 ## Not implemented yet
 
-In-app power settings, an app allow-list UI, and removal of unused upstream features such as
+An app allow-list UI (the upstream split-tunnelling screen exists), and removal of unused upstream features such as
 exit nodes and Taildrop.
 
 ## License and credits

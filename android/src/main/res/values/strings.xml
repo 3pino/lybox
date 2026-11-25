@@ -360,6 +360,14 @@
     <string name="run_as_subnet_router">Run as subnet router</string>
     <string name="use_tailscale_subnets_subtitle">Route traffic according to your network\'s rules. Some networks require this to access IP addresses that don\'t start with 100.x.y.z.</string>
     <string name="subnet_routing">Subnet routing</string>
+    <string name="lybox_section">LyBox power saving</string>
+    <string name="lybox_section_info">Turn every option off to behave like the official Tailscale app. Changes apply within a few seconds.</string>
+    <string name="lybox_cellular_derp">Relay only on mobile data</string>
+    <string name="lybox_cellular_derp_subtitle">Over mobile data, send everything through a Tailscale relay (DERP) and skip UDP probing. Lets the radio sleep; adds some latency.</string>
+    <string name="lybox_relaxed_probing">Relaxed path probing</string>
+    <string name="lybox_relaxed_probing_subtitle">On Wi-Fi, check direct paths every 20 s instead of 3 s and re-probe less often.</string>
+    <string name="lybox_netcheck_cache">Cache relay latency checks</string>
+    <string name="lybox_netcheck_cache_subtitle">While relay-only, re-measure DERP latency at most every 12 hours.</string>
     <string name="client_remote_logging_enabled">Remote client logging</string>
     <string name="client_remote_logging_enabled_subtitle">Whether debug &amp; opt-in flow logs are uploaded.</string>
     <string name="client_remote_logging_enabled_subtitle_mdm">Client logging is always enabled for devices under remote management.</string>

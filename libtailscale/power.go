@@ -4,6 +4,7 @@
 package libtailscale
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -22,13 +23,63 @@ import (
 // phone that is permanently in use by background apps (Syncthing, KDE Connect,
 // chat), that means the radio never idles. See patches/tailscale.
 //
-// The mode is read from <dataDir>/power_mode on every network change:
+// Individual features are toggled from the Settings screen, which writes
+// <dataDir>/lybox_settings (one key=0|1 per line; missing keys are on):
 //
-//	auto    (default) cellular: DERP only; Wi-Fi: direct with relaxed probing
+//	cellular_derp     on cellular, use the DERP relay only (no UDP, no STUN)
+//	relaxed_probing   when not DERP-only: 20s heartbeat, 5min direct retry/STUN
+//	netcheck_cache    while DERP-only, re-measure DERP latency at most every 12h
+//
+// With every feature off the behaviour is stock Tailscale.
+//
+// <dataDir>/power_mode is an advanced override (adb) and wins when it is not "auto":
+//
+//	auto    (default) use the feature toggles above
 //	derp    DERP only on every network
 //	relaxed direct paths with relaxed probing on every network
 //	stock   upstream behaviour
-const powerModeFile = "power_mode"
+const (
+	powerModeFile     = "power_mode"
+	lyboxSettingsFile = "lybox_settings"
+)
+
+type lyboxFeatures struct {
+	cellularDERP   bool
+	relaxedProbing bool
+	netcheckCache  bool
+}
+
+func readFeatures() lyboxFeatures {
+	f := lyboxFeatures{cellularDERP: true, relaxedProbing: true, netcheckCache: true}
+	if powerDataDir == "" {
+		return f
+	}
+	b, err := os.ReadFile(filepath.Join(powerDataDir, lyboxSettingsFile))
+	if err != nil {
+		return f
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		k, v, ok := strings.Cut(strings.TrimSpace(line), "=")
+		if !ok {
+			continue
+		}
+		on := strings.TrimSpace(v) != "0"
+		switch strings.TrimSpace(k) {
+		case "cellular_derp":
+			f.cellularDERP = on
+		case "relaxed_probing":
+			f.relaxedProbing = on
+		case "netcheck_cache":
+			f.netcheckCache = on
+		}
+	}
+	return f
+}
+
+// powerConfigKey identifies everything that influences the chosen policy.
+func powerConfigKey() string {
+	return fmt.Sprintf("%s|%+v", readPowerMode(), readFeatures())
+}
 
 var (
 	powerDataDir string
@@ -93,7 +144,7 @@ func readPowerMode() string {
 	return strings.ToLower(strings.TrimSpace(string(b)))
 }
 
-func choosePolicy(mode string, cellular bool) powerPolicy {
+func choosePolicy(mode string, cellular bool, f lyboxFeatures) powerPolicy {
 	switch mode {
 	case "stock":
 		return policyStock
@@ -101,12 +152,19 @@ func choosePolicy(mode string, cellular bool) powerPolicy {
 		return policyDERP
 	case "relaxed":
 		return policyRelaxed
-	default: // auto
-		if cellular {
-			return policyDERP
+	}
+	// auto: follow the feature toggles.
+	if cellular && f.cellularDERP {
+		p := policyDERP
+		if !f.netcheckCache {
+			p.profile.NetcheckMinInterval = 0
 		}
+		return p
+	}
+	if f.relaxedProbing {
 		return policyRelaxed
 	}
+	return policyStock
 }
 
 // applyPowerPolicy installs the policy that matches the new default network.
@@ -117,9 +175,9 @@ func (b *backend) applyPowerPolicy(ifname string) {
 	if ifname == "" {
 		return // offline: keep whatever was active
 	}
-	mode := readPowerMode()
+	mode := powerConfigKey()
 	cellular := isCellularIface(ifname)
-	p := choosePolicy(mode, cellular)
+	p := choosePolicy(readPowerMode(), cellular, readFeatures())
 
 	powerMu.Lock()
 	powerIface, powerMode = ifname, mode
@@ -160,7 +218,7 @@ func watchPowerMode() {
 		powerMu.Lock()
 		iface, last := powerIface, powerMode
 		powerMu.Unlock()
-		if iface != "" && readPowerMode() != last {
+		if iface != "" && powerConfigKey() != last {
 			b.applyPowerPolicy(iface)
 		}
 	}

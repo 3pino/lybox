@@ -63,7 +63,8 @@ android {
         storeFile = file(lyboxKeystore)
         storePassword = System.getenv("LYBOX_KEYSTORE_PASSWORD")
         keyAlias = System.getenv("LYBOX_KEY_ALIAS") ?: "lybox"
-        keyPassword = System.getenv("LYBOX_KEY_PASSWORD") ?: System.getenv("LYBOX_KEYSTORE_PASSWORD")
+        keyPassword =
+            System.getenv("LYBOX_KEY_PASSWORD") ?: System.getenv("LYBOX_KEYSTORE_PASSWORD")
       }
     }
   }

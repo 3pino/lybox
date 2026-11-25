@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tailscale.ipn.App
 import com.tailscale.ipn.BuildConfig
 import com.tailscale.ipn.R
 import com.tailscale.ipn.mdm.AlwaysNeverUserDecides
@@ -45,6 +46,7 @@ import com.tailscale.ipn.ui.util.set
 import com.tailscale.ipn.ui.viewModel.AppViewModel
 import com.tailscale.ipn.ui.viewModel.SettingsNav
 import com.tailscale.ipn.ui.viewModel.SettingsViewModel
+import java.io.File
 
 @Composable
 fun SettingsView(
@@ -64,6 +66,7 @@ fun SettingsView(
   val useTailscaleSubnets by MDMSettings.useTailscaleSubnets.flow.collectAsState()
   val isClientRemoteLoggingEnabled by viewModel.isClientRemoteLoggingEnabled.collectAsState()
   var showDisableLoggingDialog by remember { mutableStateOf(false) }
+  var lybox by remember { mutableStateOf(LyBoxSettings.load()) }
 
   Scaffold(
       topBar = {
@@ -158,6 +161,30 @@ fun SettingsView(
       }
 
       Lists.SectionDivider()
+      Lists.MutedHeader(text = stringResource(R.string.lybox_section))
+      ListItemSwitch(
+          R.string.lybox_cellular_derp,
+          subtitle = stringResource(R.string.lybox_cellular_derp_subtitle),
+          isOn = lybox.cellularDerp,
+          onToggle = { lybox = lybox.copy(cellularDerp = it).also(LyBoxSettings::save) },
+      )
+      Lists.ItemDivider()
+      ListItemSwitch(
+          R.string.lybox_relaxed_probing,
+          subtitle = stringResource(R.string.lybox_relaxed_probing_subtitle),
+          isOn = lybox.relaxedProbing,
+          onToggle = { lybox = lybox.copy(relaxedProbing = it).also(LyBoxSettings::save) },
+      )
+      Lists.ItemDivider()
+      ListItemSwitch(
+          R.string.lybox_netcheck_cache,
+          subtitle = stringResource(R.string.lybox_netcheck_cache_subtitle),
+          isOn = lybox.netcheckCache,
+          onToggle = { lybox = lybox.copy(netcheckCache = it).also(LyBoxSettings::save) },
+      )
+      Lists.InfoItem(stringResource(R.string.lybox_section_info))
+
+      Lists.SectionDivider()
       ListItemText(R.string.bug_report, onClick = settingsNav.onNavigateToBugReport)
 
       Lists.ItemDivider()
@@ -200,6 +227,48 @@ fun SettingsView(
           }
         },
     )
+  }
+}
+
+/**
+ * LyBox feature toggles. Stored as key=0|1 lines in files/lybox_settings, which the Go backend
+ * (libtailscale/power.go) re-reads every few seconds. All on is the LyBox default; all off behaves
+ * like stock Tailscale.
+ */
+data class LyBoxSettings(
+    val cellularDerp: Boolean = true,
+    val relaxedProbing: Boolean = true,
+    val netcheckCache: Boolean = true,
+) {
+  companion object {
+    private fun file() = File(App.get().filesDir, "lybox_settings")
+
+    fun load(): LyBoxSettings {
+      val values = runCatching {
+        file().readLines().mapNotNull {
+          it.split("=", limit = 2)
+              .takeIf { p -> p.size == 2 }
+              ?.let { p -> p[0].trim() to (p[1].trim() != "0") }
+        }
+      }
+          .getOrDefault(emptyList())
+          .toMap()
+      return LyBoxSettings(
+          cellularDerp = values["cellular_derp"] ?: true,
+          relaxedProbing = values["relaxed_probing"] ?: true,
+          netcheckCache = values["netcheck_cache"] ?: true,
+      )
+    }
+
+    fun save(s: LyBoxSettings) {
+      fun b(v: Boolean) = if (v) 1 else 0
+      file()
+          .writeText(
+              "cellular_derp=${b(s.cellularDerp)}\n" +
+                  "relaxed_probing=${b(s.relaxedProbing)}\n" +
+                  "netcheck_cache=${b(s.netcheckCache)}\n"
+          )
+    }
   }
 }
 
