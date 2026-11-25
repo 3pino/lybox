@@ -23,7 +23,7 @@ Grab the APK from the [Releases page](https://github.com/3pino/lybox/releases/la
 
 The official app keeps its network paths warm: a heartbeat every 3 seconds, periodic STUN
 probes, and frequent re-checks of direct paths. Each one wakes the modem, so with the
-screen off the mobile radio stayed active about half of the time in my measurements.
+screen off the mobile radio stays active a large part of the time.
 
 LyBox changes how often these probes run. Everything else (WireGuard, MagicDNS, ACLs,
 Tailscale SSH as a client, the UI) is upstream code.
@@ -38,25 +38,9 @@ Tailscale SSH as a client, the UI) is upstream code.
 Trade-offs:
 
 - Over cellular, traffic goes through a Tailscale DERP relay, so latency is higher
-  (tens of milliseconds in my tests) and throughput is limited by the relay.
+  (typically tens of milliseconds) and throughput is limited by the relay.
 - A dead path is noticed more slowly than with a 3 s heartbeat.
 - Incoming connections keep working: the tunnel stays up and the device stays reachable.
-
-### Measured results
-
-These are small, single-device measurements (Pixel 9a, screen off, 5 to 10 minutes each),
-so treat them as indicative, not as a benchmark. Battery estimates from `batterystats`
-were too noisy to quote, so I compare packets that cross the mobile network instead.
-
-| Case | Packets/s from the Tailscale app |
-|---|---|
-| Official behaviour (`stock` mode), cellular, no other apps | 4.55 |
-| LyBox, cellular, no other apps | 0.65 (after the peer stopped retrying Syncthing QUIC) |
-| Official behaviour, Wi-Fi, Syncthing, KDE Connect and others running | 9.2 |
-| LyBox, Wi-Fi, same apps | 4.4 |
-
-A large part of the remaining traffic comes from other apps and from other nodes trying to
-reach the phone (for example Syncthing QUIC retries), not from Tailscale itself.
 
 ## Power mode
 
@@ -85,7 +69,7 @@ There is no in-app setting yet.
 - `libtailscale/power.go` chooses the profile for the current network (interface name based).
 - `libtailscale/trafficlog.go` and `capture.go` are diagnostics. They are off unless a
   `files/debug_traffic` marker file exists.
-- `scripts/measure/exp.sh` is the measurement harness used for the numbers above.
+- `scripts/measure/exp.sh` is a harness for comparing packet counts and battery stats between modes.
 
 ### Build locally
 
