@@ -11,17 +11,16 @@ stamp="third_party/tailscale/.lybox-stamp"
 want="${mod_ver} $(cat patches/tailscale/*.patch | sha256sum | cut -d' ' -f1)"
 if [[ -f $stamp && "$(cat "$stamp")" == "$want" ]]; then exit 0; fi
 
-# Run outside this module: on a fresh checkout the replace target doesn't exist
-# yet and `go env` would fail while loading go.mod.
+# On a fresh checkout the replace target doesn't exist yet, so `go` can't load
+# our go.mod. Point it at a scratch module file for these two commands.
 root=$(pwd)
-gopath=$(cd "${TMPDIR:-/tmp}" && "$root/tool/go" env GOMODCACHE)
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+printf 'module scratch\n\ngo 1.21\n' > "$tmp/go.mod"
+gopath=$(GOFLAGS="-modfile=$tmp/go.mod" ./tool/go env GOMODCACHE)
 src="$gopath/tailscale.com@${mod_ver}"
 if [[ ! -d $src ]]; then
-  # Download from a scratch module so the (possibly dangling) replace
-  # directive in our own go.mod can't get in the way.
-  tmp=$(mktemp -d)
-  (cd "$tmp" && "$root/tool/go" mod init scratch >/dev/null 2>&1 && "$root/tool/go" mod download "tailscale.com@${mod_ver}")
-  rm -rf "$tmp"
+  GOFLAGS="-modfile=$tmp/go.mod" ./tool/go mod download "tailscale.com@${mod_ver}"
 fi
 [[ -d $src ]] || { echo "module cache missing $src" >&2; exit 1; }
 
