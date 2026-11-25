@@ -1,38 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from app-icon.svg (lucide "waypoints"); the group maps its 24-unit grid into the 108dp adaptive-icon canvas. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-  <path
-      android:pathData="M34.5,39.37a4.87,4.88 0,1 0,9.75 0a4.87,4.88 0,1 0,-9.75 0z"
-      android:fillColor="#ffffff"
-      android:fillAlpha="0.4"/>
-  <path
-      android:pathData="M49.13,39.37a4.87,4.88 0,1 0,9.75 0a4.87,4.88 0,1 0,-9.75 0z"
-      android:fillColor="#ffffff"
-      android:fillAlpha="0.4"/>
-  <path
-      android:pathData="M63.75,39.37a4.87,4.88 0,1 0,9.75 0a4.87,4.88 0,1 0,-9.75 0z"
-      android:fillColor="#ffffff"
-      android:fillAlpha="0.4"/>
-  <path
-      android:pathData="M34.5,54a4.87,4.88 0,1 0,9.75 0a4.87,4.88 0,1 0,-9.75 0z"
-      android:fillColor="#ffffff"/>
-  <path
-      android:pathData="M49.13,54a4.87,4.88 0,1 0,9.75 0a4.87,4.88 0,1 0,-9.75 0z"
-      android:fillColor="#ffffff"/>
-  <path
-      android:pathData="M63.75,54a4.87,4.88 0,1 0,9.75 0a4.87,4.88 0,1 0,-9.75 0z"
-      android:fillColor="#ffffff"/>
-  <path
-      android:pathData="M34.5,68.62a4.87,4.88 0,1 0,9.75 0a4.87,4.88 0,1 0,-9.75 0z"
-      android:fillColor="#ffffff"
-      android:fillAlpha="0.4"/>
-  <path
-      android:pathData="M49.13,68.62a4.87,4.88 0,1 0,9.75 0a4.87,4.88 0,1 0,-9.75 0z"
-      android:fillColor="#ffffff"/>
-  <path
-      android:pathData="M63.75,68.62a4.87,4.88 0,1 0,9.75 0a4.87,4.88 0,1 0,-9.75 0z"
-      android:fillColor="#ffffff"
-      android:fillAlpha="0.4"/>
+  <group android:translateX="20.25" android:translateY="20.25" android:scaleX="2.8125" android:scaleY="2.8125">
+    <path android:pathData="m10.586,5.414 l-5.172,5.172 M18.586,13.414 l-5.172,5.172 M6,12 h12"
+        android:strokeColor="#a2a2a2" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    <path android:pathData="M10,20a2,2 0,1 0,4 0a2,2 0,1 0,-4 0z M10,4a2,2 0,1 0,4 0a2,2 0,1 0,-4 0z M18,12a2,2 0,1 0,4 0a2,2 0,1 0,-4 0z M2,12a2,2 0,1 0,4 0a2,2 0,1 0,-4 0z"
+        android:strokeColor="#a2a2a2" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+  </group>
 </vector>

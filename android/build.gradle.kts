@@ -26,7 +26,10 @@ android {
     targetSdk = providers.gradleProperty("androidApiLevel").get().toInt()
 
     versionCode = computeVersionCode()
-    versionName = getVersionProperty("VERSION_LONG")
+    // LYBOX_VERSION (e.g. 0.1.0, from the git tag) wins over the upstream Tailscale version.
+    versionName = System.getenv("LYBOX_VERSION") ?: getVersionProperty("VERSION_LONG")
+    // arm64 phones only; keeps the APK small.
+    ndk { abiFilters += "arm64-v8a" }
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
     buildConfigField(
@@ -51,11 +54,26 @@ android {
   flavorDimensions += "version"
   namespace = "com.tailscale.ipn"
 
+  // Release signing comes from the environment (GitHub Actions secrets). Without
+  // LYBOX_KEYSTORE the release APK is left unsigned.
+  val lyboxKeystore = System.getenv("LYBOX_KEYSTORE")
+  signingConfigs {
+    if (lyboxKeystore != null) {
+      create("lybox") {
+        storeFile = file(lyboxKeystore)
+        storePassword = System.getenv("LYBOX_KEYSTORE_PASSWORD")
+        keyAlias = System.getenv("LYBOX_KEY_ALIAS") ?: "lybox"
+        keyPassword = System.getenv("LYBOX_KEY_PASSWORD") ?: System.getenv("LYBOX_KEYSTORE_PASSWORD")
+      }
+    }
+  }
+
   buildTypes {
     debug { manifestPlaceholders["leanbackRequired"] = isTV() }
 
     release {
       manifestPlaceholders["leanbackRequired"] = isTV()
+      if (lyboxKeystore != null) signingConfig = signingConfigs.getByName("lybox")
       isMinifyEnabled = true
       isShrinkResources = true
 

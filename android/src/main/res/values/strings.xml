@@ -31,7 +31,7 @@
 
     <!-- Strings for the about screen -->
     <string name="app_name" translatable="false">LyBox</string>
-    <string name="tile_name" translatable="false">Tailscale</string>
+    <string name="tile_name" translatable="false">LyBox</string>
     <string name="version">Version</string>
     <string name="about_view_header">About Tailscale</string>
     <string name="about_view_title">Tailscale for Android</string>

@@ -161,6 +161,17 @@ $(DEBUG_APK): libtailscale debug-symbols version gradle-dependencies build-unstr
 	(cd android && ./gradlew test assembleDebug)
 	install -C android/build/outputs/apk/debug/android-debug.apk $@
 
+# LyBox: release APK (arm64). Signed when LYBOX_KEYSTORE etc. are set (see
+# android/build.gradle.kts); version comes from LYBOX_VERSION.
+LYBOX_RELEASE_APK := lybox-release.apk
+
+.PHONY: lybox-release
+lybox-release: $(LYBOX_RELEASE_APK)
+
+$(LYBOX_RELEASE_APK): libtailscale version gradle-dependencies build-unstripped-aar
+	(cd android && ./gradlew assembleRelease)
+	install -C $$(ls android/build/outputs/apk/release/*.apk | head -1) $@
+
 # Builds the release AAB and signs it (phone/tablet/chromeOS variant)
 .PHONY: release
 release: jarsign-env $(RELEASE_AAB)
